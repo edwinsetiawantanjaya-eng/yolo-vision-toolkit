@@ -1,0 +1,1 @@
+Put images, a video or a folder here to run the trained model on (3. Predict).
