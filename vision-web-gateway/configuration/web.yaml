@@ -1,0 +1,17 @@
+﻿host: 0.0.0.0            # 0.0.0.0 = reachable from other PCs; 127.0.0.1 = this PC only
+port: 8000
+max_upload_mb: 2048      # biggest zip a user can upload
+max_unzipped_mb: 6144    # biggest size after unzipping (zip-bomb guard)
+min_images: 10
+max_epochs: 100
+max_active_per_user: 2   # queued + running jobs one user may have (admins: unlimited)
+keep_days: 30            # finished jobs older than this are deleted
+max_datasets_per_user: 10  # saved datasets per user (admins: unlimited); datasets are never deleted automatically
+predict_device: cpu      # cpu = never fights the training for the GPU; auto = let YOLO pick (GPU if free)
+max_predict_mb: 200      # biggest image or video a user can send to Predict
+max_video_frames: 3000   # longest video (about 2 min at 25 fps); more frames take longer on a CPU
+models:                  # what users can pick
+- yolo26n.pt
+- yolo26s.pt
+- yolo11n.pt
+- yolov8n.pt

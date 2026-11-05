@@ -1,0 +1,9 @@
+﻿# PyTorch is installed first by ..\00.Setup_env.ps1 (CUDA or CPU build).
+# YOLO26 needs Ultralytics 8.4 or newer; older models (v8, v9, v10, 11) also work with it.
+ultralytics>=8.4
+psutil
+pyyaml
+fastapi
+uvicorn
+python-multipart
+imageio-ffmpeg

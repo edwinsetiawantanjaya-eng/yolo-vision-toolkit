@@ -1,4 +1,4 @@
-# Vision-Template
+# yolo-vision-toolkit
 
 No-code toolkit to label images, train an Ultralytics YOLO object detector, and run predictions, either on one PC (desktop GUI) or as a shared multi-user training server (web gateway). Built for engineers who need a vision model but do not want to write training code.
 

@@ -1,0 +1,51 @@
+model: yolo26n.pt
+model_presets:
+- yolo26n.pt
+- yolo26s.pt
+- yolo26m.pt
+- yolo26l.pt
+- yolo26x.pt
+- yolo11n.pt
+- yolo11s.pt
+- yolo11m.pt
+- yolo11l.pt
+- yolo11x.pt
+- yolov10n.pt
+- yolov9s.pt
+- yolov8n.pt
+- yolov8s.pt
+- yolov8m.pt
+run_name: exp
+paths:
+  data_dir: data
+  runs_dir: runs
+  output_dir: outputs
+split:
+  val: 0.15
+  test: 0.1
+  seed: 0
+  group_regex: ''
+train:
+  imgsz: 640
+  epochs: 100
+  patience: 30
+  batch: auto
+  workers: auto
+  device: auto
+  cache: auto
+  amp: auto
+  optimizer: auto
+  cos_lr: false
+  single_cls: false
+  mosaic: 1.0
+  close_mosaic: 10
+  scale: 0.5
+  fliplr: 0.5
+  flipud: 0.0
+  seed: 0
+predict:
+  weights: auto
+  source: input
+  conf: 0.25
+  imgsz: auto
+  save_txt: true

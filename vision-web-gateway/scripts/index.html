@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YOLO Web Gateway</title>
+<style>
+:root{--bg:#f6f6f4;--card:#fff;--text:#1f1f1d;--muted:#6b6a65;--line:#dcdbd5;--accent:#185fa5;--accent-text:#fff;--ok:#3b6d11;--okbg:#eaf3de;--bad:#a32d2d;--badbg:#fcebeb;--warn:#854f0b;--warnbg:#faeeda;--run:#0c447c;--runbg:#e6f1fb}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#212120;--text:#ececea;--muted:#a3a29b;--line:#3a3a37;--accent:#85b7eb;--accent-text:#042c53;--ok:#c0dd97;--okbg:#27500a;--bad:#f7c1c1;--badbg:#791f1f;--warn:#fac775;--warnbg:#633806;--run:#b5d4f4;--runbg:#0c447c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Segoe UI,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:16px}
+h1{font-size:20px;font-weight:500;margin:0}
+h2{font-size:16px;font-weight:500;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;margin-bottom:12px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+button,input,select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button{cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+button.danger{color:var(--bad);border-color:var(--bad)}
+nav button.on{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+label{display:block;color:var(--muted);font-size:13px;margin:8px 0 2px}
+input[type=text],input[type=password],input[type=number],input[type=email],select{width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 16px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-weight:500}
+tr.job{cursor:pointer}tr.job:hover,tr.sel{background:var(--bg)}
+.scroll{overflow-x:auto}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px}
+.queued{background:var(--warnbg);color:var(--warn)}.running{background:var(--runbg);color:var(--run)}
+.done{background:var(--okbg);color:var(--ok)}.failed,.cancelled{background:var(--badbg);color:var(--bad)}
+.meter{background:var(--line);border-radius:4px;height:8px;min-width:90px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+pre{background:#111;color:#ddd;padding:10px;border-radius:8px;overflow:auto;max-height:280px;font-size:12px;margin:8px 0 0}
+.muted{color:var(--muted);font-size:13px}
+.read{margin:0;padding-left:18px}.read li{margin:8px 0}.read b{font-weight:500}
+#msg{position:sticky;top:0;z-index:5}
+#msg div{padding:8px 12px;border-radius:8px;margin-bottom:8px}
+.m-ok{background:var(--okbg);color:var(--ok)}.m-bad{background:var(--badbg);color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hide{display:none}
+:root{--c1:#185fa5;--c2:#3b6d11;--c3:#a32d2d;--c4:#854f0b}
+@media (prefers-color-scheme:dark){:root{--c1:#85b7eb;--c2:#c0dd97;--c3:#f09595;--c4:#fac775}}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.tile{background:var(--bg);border-radius:8px;padding:8px 12px}.tile b{display:block;font-size:20px;font-weight:500}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart text{fill:var(--muted);font-size:11px}svg.chart .grid{stroke:var(--line);stroke-width:1}
+svg.chart polyline{fill:none;stroke-width:2;stroke-linejoin:round}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 12px}
+.out img,.out video{max-width:100%;border-radius:8px;margin-top:8px}
+#login{max-width:340px;margin:12vh auto}
+</style>
+</head>
+<body>
+<main>
+<div id="msg" role="status"></div>
+
+<div id="login" class="card hide">
+  <h1>YOLO Web Gateway</h1>
+  <p class="muted">Sign in to train a model and see the queue.</p>
+  <form id="loginForm">
+    <label for="ln">Name</label><input id="ln" type="text" autocomplete="username" required>
+    <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+    <p><button class="primary" type="submit">Sign in</button></p>
+  </form>
+</div>
+
+<div id="app" class="hide">
+  <div class="bar">
+    <h1>YOLO Web Gateway</h1>
+    <div class="row"><span id="who" class="muted"></span><button id="logout">Sign out</button></div>
+  </div>
+  <nav id="nav"></nav>
+
+  <section id="p-queue">
+    <div class="card">
+      <h2>Queue and jobs (everyone sees all jobs)</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Job</th><th>Owner</th><th>Model</th><th>State</th><th>Progress</th><th>ETA</th><th>Submitted</th><th></th></tr></thead>
+        <tbody id="jobs"></tbody>
+      </table></div>
+      <p id="nojobs" class="muted hide">No jobs yet.</p>
+    </div>
+    <div id="detail" class="card hide"></div>
+    <div id="charts" class="card hide"></div>
+    <div id="predict" class="card hide"></div>
+  </section>
+
+  <section id="p-data" class="hide">
+    <div class="card">
+      <h2>Add a dataset</h2>
+      <form id="dsForm" class="row">
+        <input id="dn" type="text" maxlength="80" placeholder="name (default: the file name)" style="width:240px">
+        <input id="df" type="file" accept=".zip" required>
+        <button class="primary" id="dgo" type="submit">Upload</button><span id="dpct" class="muted"></span>
+      </form>
+      <p class="muted">A saved dataset can be used by any number of trainings without uploading it again. Same zip layout as in New training. Every zip sent with a training is saved here too.</p>
+    </div>
+    <div class="card">
+      <h2 id="dsTitle">My datasets</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Name</th><th class="adm">Owner</th><th>Images</th><th>Labeled / background</th><th>Boxes per class</th><th>Size</th><th>Added</th><th>Trainings</th><th></th></tr></thead>
+        <tbody id="dsRows"></tbody>
+      </table></div>
+      <p id="nods" class="muted hide">No datasets yet.</p>
+    </div>
+  </section>
+
+  <section id="p-new" class="hide">
+    <div class="card">
+      <h2>Start a training</h2>
+      <form id="newForm">
+        <div class="grid">
+          <div><label for="nd">Dataset</label><select id="nd"></select></div>
+          <div id="nfBox"><label for="nf">Dataset zip (saved to Datasets too)</label><input id="nf" type="file" accept=".zip" required></div>
+          <div><label for="nm">Model</label><select id="nm"></select></div>
+          <div><label for="ne">Epochs</label><input id="ne" type="number" min="1" value="50" required></div>
+          <div><label for="nt" title="Optional goal. When the finished training stays below it, the results page explains what to try.">Target mAP50 % (optional)</label><input id="nt" type="number" min="0" max="100" step="1" placeholder="e.g. 95"></div>
+          <div><label for="nn">Note (optional)</label><input id="nn" type="text" maxlength="200"></div>
+        </div>
+        <details style="margin:12px 0">
+          <summary>Training settings (optional, the defaults are the server's)</summary>
+          <div class="grid" id="ns" style="margin-top:8px"></div>
+          <button type="button" id="nsReset">Reset to defaults</button>
+        </details>
+        <p class="muted" id="hint"></p>
+        <div class="row"><button class="primary" id="go" type="submit">Upload and queue</button><span id="upct" class="muted"></span></div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>What the zip must contain</h2>
+      <pre>my-dataset.zip
+  classes.txt        one class name per line (line 1 = class 0)
+  images/            .jpg .png ...
+  labels/            YOLO .txt, same name as the image: class x y w h (0 to 1)</pre>
+      <p class="muted">An image without a label file counts as background. Folder names inside the zip do not matter, file names must be unique.</p>
+    </div>
+  </section>
+
+  <section id="p-admin" class="hide">
+    <div class="card">
+      <h2>Users</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Name</th><th>Role</th><th>Email (for notifications)</th><th>Active</th><th></th></tr></thead>
+        <tbody id="users"></tbody>
+      </table></div>
+      <form id="userForm" class="row" style="margin-top:12px">
+        <input id="un" type="text" placeholder="new name" required style="width:150px">
+        <input id="up" type="password" placeholder="password (8+)" required autocomplete="new-password" style="width:160px">
+        <input id="ue" type="email" placeholder="email" style="width:200px">
+        <select id="ur" style="width:100px"><option>user</option><option>admin</option></select>
+        <button class="primary" type="submit">Add user</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Models</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Users can pick</th><th>Model</th><th>On the server</th><th></th></tr></thead>
+        <tbody id="models"></tbody>
+      </table></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="modelSave" type="button">Save list</button>
+        <input id="modelNew" type="text" placeholder="other model, e.g. yolo11m.pt" style="width:220px">
+        <button id="modelAdd" type="button">Download</button>
+      </div>
+      <p class="muted">Download puts the weights in the server's <code>models</code> folder (the server needs internet for that). A model that is not downloaded is fetched by the first training that uses it. Tick the ones users may choose and press Save list.</p>
+    </div>
+    <div class="card">
+      <h2>Server load</h2>
+      <form id="loadForm" class="row">
+        <label for="js" style="margin:0">Share of the server per job</label>
+        <input id="js" type="number" min="10" max="100" step="1" required style="width:90px"> %
+        <button class="primary" type="submit">Save</button>
+      </form>
+      <p id="loadHint" class="muted"></p>
+      <p class="muted">Each running job may use that share of the CPU threads, RAM and GPU memory (GPU memory limits the batch size). Jobs start in order while the shares of the running jobs add up to 100% or less; the rest wait in the queue. Examples: 100 = one job at a time, 50 = two at a time, 33 = three at a time. A running job keeps the share it started with. The GPU itself is time-shared between running jobs, not capped.</p>
+    </div>
+    <div class="card">
+      <h2>Notifications</h2>
+      <form id="setForm">
+        <div class="grid">
+          <div><label>SMTP server</label><input id="s_smtp_host" type="text" placeholder="smtp.company.com"></div>
+          <div><label>Port</label><input id="s_smtp_port" type="number"></div>
+          <div><label>Security</label><select id="s_smtp_security"><option value="starttls">STARTTLS (587)</option><option value="ssl">SSL (465)</option><option value="none">None (25)</option></select></div>
+          <div><label>SMTP user (blank = no login)</label><input id="s_smtp_user" type="text" autocomplete="off"></div>
+          <div><label>SMTP password <span id="pwset" class="muted"></span></label><input id="s_smtp_password" type="password" autocomplete="new-password" placeholder="blank = keep saved"></div>
+          <div><label>From address</label><input id="s_smtp_from" type="email" placeholder="yolo@company.com"></div>
+          <div style="grid-column:1/-1"><label>Teams webhook URL</label><input id="s_teams_url" type="text" placeholder="https://..."></div>
+          <div style="grid-column:1/-1"><label>This site's address (put in messages, optional)</label><input id="s_public_url" type="text" placeholder="http://server:8000"></div>
+        </div>
+        <p class="row"><label style="margin:0"><input id="s_notify_email" type="checkbox"> email the job owner</label>
+          <label style="margin:0"><input id="s_notify_teams" type="checkbox"> post to Teams</label></p>
+        <div class="row">
+          <button class="primary" type="submit">Save</button>
+          <input id="testTo" type="email" placeholder="send test to (default: my email)" style="width:240px">
+          <button type="button" id="testMail">Test email</button>
+          <button type="button" id="testTeams">Test Teams</button>
+        </div>
+        <p class="muted">Save first, then test. The SMTP password is stored in data/gateway.db on the server.</p>
+        <p id="lastErr" class="muted"></p>
+      </form>
+    </div>
+  </section>
+
+  <section id="p-account" class="hide">
+    <div class="card">
+      <h2>My account</h2>
+      <form id="emailForm" class="row"><input id="ae" type="email" placeholder="my email" style="width:260px"><button type="submit">Save email</button></form>
+      <p class="muted">Your email gets a message when your job finishes, fails or is cancelled.</p>
+    </div>
+    <div class="card">
+      <h2>Change password</h2>
+      <form id="pwForm" class="row">
+        <input id="po" type="password" placeholder="current password" required autocomplete="current-password" style="width:200px">
+        <input id="pn" type="password" placeholder="new password (8+)" required autocomplete="new-password" style="width:200px">
+        <button type="submit">Change</button>
+      </form>
+    </div>
+  </section>
+</div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+let me = null, sel = null, tab = "queue", timer = null;
+
+function h(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e[k] = v;
+    else if (typeof v === "boolean") e.toggleAttribute(k, v);  // setAttribute("disabled", false) would still disable
+    else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat(Infinity)) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+function say(text, bad) {
+  const d = h("div", { class: bad ? "m-bad" : "m-ok" }, text);
+  $("#msg").append(d);
+  setTimeout(() => d.remove(), bad ? 9000 : 4000);
+}
+async function api(path, method = "GET", body) {
+  const r = await fetch(path, { method, credentials: "same-origin",
+    headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== "/api/login") { showLogin(); throw new Error("signed out"); }
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "request failed (" + r.status + ")");
+  return d;
+}
+const fail = e => say(e.message, true);
+const when = t => t ? new Date(t * 1000).toLocaleString() : "";
+function dur(s) {
+  if (s == null) return "";
+  s = Math.round(s); const hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60);
+  return hh ? `${hh}h ${mm}m` : mm ? `${mm}m ${s % 60}s` : `${s}s`;
+}
+function badge(j) {
+  return h("span", { class: "badge " + j.state }, j.state === "queued" && j.position ? `queued #${j.position}` : j.state);
+}
+function meter(f) {
+  return h("div", { class: "meter" }, h("i", { style: `width:${Math.round((f || 0) * 100)}%` }));
+}
+
+function showLogin() {
+  clearInterval(timer); me = null;
+  $("#app").classList.add("hide"); $("#login").classList.remove("hide");
+}
+async function start() {
+  try { me = await api("/api/me"); } catch { return showLogin(); }
+  $("#login").classList.add("hide"); $("#app").classList.remove("hide");
+  $("#who").textContent = `${me.name} (${me.role})`;
+  $("#ae").value = me.email;
+  $("#nm").replaceChildren(...me.options.models.map(m => h("option", {}, m)));
+  $("#ne").max = me.options.max_epochs; $("#ne").value = Math.min(50, me.options.max_epochs);
+  buildSettings();
+  $("#hint").textContent = `Max ${me.options.max_epochs} epochs, zip up to ${me.options.max_upload_mb} MB, at least ${me.options.min_images} images.`;
+  const tabs = [["queue", "Queue and jobs"], ["data", "Datasets"], ["new", "New training"], ...(me.role === "admin" ? [["admin", "Admin"]] : []), ["account", "Account"]];
+  $("#nav").replaceChildren(...tabs.map(([k, t]) => h("button", { "data-t": k, onclick: () => show(k) }, t)));
+  show(tab === "admin" && me.role !== "admin" ? "queue" : tab);
+  clearInterval(timer); timer = setInterval(poll, 3000); poll();
+}
+function show(t) {
+  tab = t;
+  for (const k of ["queue", "data", "new", "admin", "account"]) $("#p-" + k).classList.toggle("hide", k !== t);
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  if (t === "admin") loadAdmin();
+  if (t === "data" || t === "new") loadDatasets();
+}
+
+async function poll() {
+  try { renderJobs(await api("/api/jobs")); if (sel) renderDetail(await api("/api/jobs/" + sel)); } catch (e) { if (e.message !== "signed out") console.warn(e); }
+}
+function renderJobs(jobs) {
+  $("#nojobs").classList.toggle("hide", jobs.length > 0);
+  $("#jobs").replaceChildren(...jobs.map(j => {
+    const prog = j.state === "queued" ? "" : j.state === "running" && j.frac == null ? "starting..." : [meter(j.frac), `${Math.round((j.frac || 0) * 100)}%` + (j.epoch_total ? `  ep ${j.epoch}/${j.epoch_total}` : "")];
+    return h("tr", { class: "job" + (j.id === sel ? " sel" : ""), onclick: () => { sel = j.id; poll(); } },
+      h("td", {}, j.id, j.note ? h("div", { class: "muted" }, j.note) : null), h("td", {}, j.owner), h("td", {}, `${j.model} x${j.epochs}`),
+      h("td", {}, badge(j)), h("td", {}, prog), h("td", {}, j.eta != null ? dur(j.eta) : ""), h("td", {}, when(j.created)),
+      h("td", {}, j.can_cancel ? h("button", { class: "danger", onclick: ev => { ev.stopPropagation(); cancelJob(j.id); } }, "Cancel") : null,
+        j.can_delete ? h("button", { class: "danger", onclick: ev => { ev.stopPropagation(); deleteJob(j.id); } }, "Delete") : null));
+  }));
+}
+function renderDetail(j) {
+  const box = $("#detail"); box.classList.remove("hide");
+  const rows = [["State", badge(j)], ["Owner", j.owner], ["Model", `${j.model}, ${j.epochs} epochs`], ["Server share", j.share ? j.share + "%" : ""], ["Dataset", j.dataset_name], ["Images", j.images], ["Submitted", when(j.created)],
+    ["Started", when(j.started)], ["Finished", when(j.finished)], ["Result", j.detail]].filter(r => r[1] !== "" && r[1] != null);
+  const kids = [h("h2", {}, "Job " + j.id), h("table", {}, ...rows.map(r => h("tr", {}, h("th", {}, r[0]), h("td", {}, r[1]))))];
+  if (!j.can_open) kids.push(h("p", { class: "muted" }, "Only the owner and admins can open the log and result of this job."));
+  else {
+    if (j.summary && j.summary.classes) kids.push(h("p", { class: "muted" }, `${j.summary.labeled} labeled and ${j.summary.background} background images. Boxes per class: ` +
+      Object.entries(j.summary.classes).map(([k, v]) => `${k} ${v}`).join(", ")));
+    const acts = h("div", { class: "row", style: "margin-top:8px" });
+    if (j.state === "done") acts.append(h("a", { href: `/api/jobs/${j.id}/download` }, h("button", { class: "primary" }, "Download result (best.pt + plots)")));
+    if (j.can_cancel) acts.append(h("button", { class: "danger", onclick: () => cancelJob(j.id) }, "Cancel job"));
+    if (j.can_delete) acts.append(h("button", { class: "danger", onclick: () => deleteJob(j.id) }, "Delete log and files"));
+    acts.append(h("button", { onclick: () => { sel = null; box.classList.add("hide"); syncExtras(null); renderRows(); } }, "Close"));
+    kids.push(acts, h("pre", {}, j.log || "(no log yet)"));
+  }
+  const pre = box.querySelector("pre"), atEnd = !pre || pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+  box.replaceChildren(...kids);
+  const np = box.querySelector("pre"); if (np && atEnd) np.scrollTop = np.scrollHeight;
+  syncExtras(j);
+}
+
+// ---- charts and predict: separate cards so the 3 s refresh does not wipe a chosen file or a result ----
+let exKey = "", exEpoch = -1, predTimer = null;
+function syncExtras(j) {
+  const ok = !!j && j.can_open && (j.state === "running" || j.state === "done");
+  $("#charts").classList.toggle("hide", !ok); $("#predict").classList.toggle("hide", !(ok && j.state === "done"));
+  if (!ok) { exKey = ""; clearInterval(predTimer); return; }
+  const key = j.id + j.state;
+  if (key !== exKey || (j.state === "running" && j.epoch !== exEpoch)) { exEpoch = j.epoch; loadCharts(j.id, j); }
+  if (key !== exKey && j.state === "done") buildPredict(j.id);
+  exKey = key;
+}
+const SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs = {}, ...kids) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  for (const c of kids) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+function lineChart(title, xs, series) {  // every value is 0..1
+  const W = 360, H = 220, L = 34, R = 10, T = 10, B = 26, n = xs.length;
+  const px = i => L + (n < 2 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1)), py = v => T + (1 - v) * (H - T - B);
+  const svg = sv("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": title });
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) svg.append(sv("line", { class: "grid", x1: L, x2: W - R, y1: py(v), y2: py(v) }), sv("text", { x: L - 4, y: py(v) + 4, "text-anchor": "end" }, v));
+  const step = Math.max(1, Math.ceil(n / 8));
+  xs.forEach((x, i) => { if (i % step === 0 || i === n - 1) svg.append(sv("text", { x: px(i), y: H - 8, "text-anchor": "middle" }, x)); });
+  for (const s of series) {
+    svg.append(sv("polyline", { points: s.values.map((v, i) => `${px(i)},${py(v)}`).join(" "), style: `stroke:var(${s.color})` }));
+    s.values.forEach((v, i) => svg.append(sv("circle", { cx: px(i), cy: py(v), r: n > 40 ? 1.5 : 3, style: `fill:var(${s.color})` }, sv("title", {}, `${s.name}, epoch ${xs[i]}: ${v.toFixed(3)}`))));
+  }
+  const legend = h("div", { class: "muted" }, series.map(s => [h("span", { class: "sw", style: `background:var(${s.color})` }), s.name]));
+  return h("div", {}, h("div", { class: "muted" }, title), svg, legend);
+}
+// Plain rules over the validation numbers; thresholds are rules of thumb, not guarantees.
+function readout(m, j) {
+  const n = m.length, last = m[n - 1], f = v => v.toFixed(3), items = [];
+  const add = (what, tryThis) => items.push(h("li", {}, h("b", {}, what), h("div", { class: "muted" }, "Try: " + tryThis)));
+  const rising = n >= 4 && last.map50 - m[n - 4].map50 > 0.01, best = m.reduce((a, r) => r.map50 > a.map50 ? r : a);
+  const running = j && j.state === "running", tgt = j && j.target, out = (...els) => h("div", {}, h("h2", {}, "What this means"), ...els);
+  if (tgt) {  // the user set a goal: advice only when the finished training missed it
+    const line = `Target mAP50 ${(tgt * 100).toFixed(0)}%, best so far ${(best.map50 * 100).toFixed(1)}% (epoch ${best.epoch}).`;
+    if (running) return out(h("p", {}, line + " Still training."));
+    if (best.map50 >= tgt) return out(h("p", {}, h("b", {}, "Target reached. "), line));
+    if (j.state !== "done") return out(h("p", { class: "muted" }, line));
+    items.push(h("li", {}, h("b", {}, `Target not reached: ${(best.map50 * 100).toFixed(1)}% is ${((tgt - best.map50) * 100).toFixed(1)} points below ${(tgt * 100).toFixed(0)}%.`), h("div", { class: "muted" }, "What to try, based on your numbers:")));
+  }
+  if (last.map50 >= 0.8) add(`Good overall (mAP50 ${f(last.map50)}).`, "check it on your own images in Predict before relying on it.");
+  else if (last.map50 >= 0.5) add(`Moderate overall (mAP50 ${f(last.map50)}). Fine for a first test, expect visible mistakes.`, "the biggest gains usually come from more and cleaner data (see below).");
+  else add(`Low overall (mAP50 ${f(last.map50)}). The model has not learned the task well yet.`, "check that classes.txt matches the labels and the boxes are tight, have roughly 100+ labelled objects per class, and train more epochs.");
+  if (running) add("Still training, so these numbers will change.", "wait for the job to finish before judging it.");
+  else if (best.map50 - last.map50 > 0.03 && best.epoch < last.epoch) add(`mAP50 peaked at epoch ${best.epoch} and then dropped, a sign of overfitting.`, "fewer epochs or a lower patience (e.g. 20), more data, stronger augmentation (mosaic, scale), or a smaller model.");
+  else if (rising && j && n >= j.epochs) add("Still improving when the training stopped.", "more epochs (New training > Epochs), and keep patience at 30 or more.");
+  else if (!rising && n >= 10) add("The curve has flattened, more epochs will not help much.", "a bigger model (s or m), a larger image size, or more data.");
+  if (last.precision < 0.6 && last.recall < 0.6) add(`Both precision (${(last.precision * 100).toFixed(0)}%) and recall (${(last.recall * 100).toFixed(0)}%) are low.`, "mostly a data problem: add more images with different light, angle and background, fix wrong or missing labels, balance the classes, then try a bigger model.");
+  else if (last.recall < 0.6) add(`The model misses many real objects (recall ${(last.recall * 100).toFixed(0)}%).`, "more images of the cases it misses, a larger image size (960 or 1280) when objects are small, label every object (an unlabelled one teaches the model to ignore it), or a lower confidence in Predict.");
+  else if (last.precision < 0.6) add(`Many boxes are wrong (precision ${(last.precision * 100).toFixed(0)}%, false-alarm ratio ${((1 - last.precision) * 100).toFixed(0)}%).`, "add background images (no objects, empty label file), add images of look-alike things, check for wrong labels, a higher confidence in Predict (0.4 to 0.5), or a bigger model.");
+  else add("Precision and recall are balanced.", "nothing to fix here; improve mAP with more data if you need better results.");
+  if (last.map50 >= 0.4 && last.map50 - last.map5095 > 0.3) add(`Objects are found but the boxes are loose (mAP50-95 ${f(last.map5095)} is far below mAP50 ${f(last.map50)}).`, "tighter labels, a larger image size, a bigger model, cos_lr on, close_mosaic 10 to 15, more epochs.");
+  if (n >= 5) {
+    const t = m.slice(-5), spread = k => Math.max(...t.map(r => r[k])) - Math.min(...t.map(r => r[k]));
+    if (Math.max(spread("precision"), spread("recall")) > 0.15) add("Precision and recall jump a lot between epochs.", "the validation set is probably small: add more data, raise split.val (e.g. 0.2), or turn cos_lr on.");
+  }
+  return out(h("ul", { class: "read" }, items), h("p", { class: "muted" }, "Rules of thumb from the validation numbers only. Change one thing at a time and compare the next training."));
+}
+async function loadCharts(id, j) {
+  let m; try { m = (await api(`/api/jobs/${id}/metrics`)).epochs; } catch { return; }
+  if (sel !== id) return;
+  const box = $("#charts"), kids = [h("h2", {}, "Training results (per epoch)")];
+  if (!m.length) kids.push(h("p", { class: "muted" }, "No epoch has finished yet."));
+  else {
+    const last = m[m.length - 1], xs = m.map(r => r.epoch), pct = v => (v * 100).toFixed(1) + "%";
+    const tile = (name, v, hint) => h("div", { class: "tile", title: hint }, h("span", { class: "muted" }, name), h("b", {}, v));
+    kids.push(h("div", { class: "tiles" },
+      tile("Precision (accuracy of detections)", pct(last.precision), "Of everything the model boxed, how much was right"),
+      tile("Recall", pct(last.recall), "Of the real objects, how many the model found"),
+      tile("mAP50", last.map50.toFixed(3), "Mean average precision at IoU 0.5"),
+      tile("mAP50-95", last.map5095.toFixed(3), "Mean average precision averaged over IoU 0.5 to 0.95"),
+      tile("Miss ratio (1 - recall)", pct(1 - last.recall), "Real objects the model did not find"),
+      tile("False-alarm ratio (1 - precision)", pct(1 - last.precision), "Boxes that were wrong")),
+      h("p", { class: "muted" }, `Values of epoch ${last.epoch}, measured on the validation images.`),
+      h("div", { class: "charts" },
+        lineChart("Precision and recall", xs, [{ name: "Precision", color: "--c1", values: m.map(r => r.precision) }, { name: "Recall", color: "--c2", values: m.map(r => r.recall) }]),
+        lineChart("mAP", xs, [{ name: "mAP50", color: "--c1", values: m.map(r => r.map50) }, { name: "mAP50-95", color: "--c4", values: m.map(r => r.map5095) }]),
+        lineChart("Miss and false-alarm ratio (lower is better)", xs, [{ name: "Miss (1 - recall)", color: "--c3", values: m.map(r => 1 - r.recall) }, { name: "False alarm (1 - precision)", color: "--c4", values: m.map(r => 1 - r.precision) }])),
+      readout(m, j));
+  }
+  box.replaceChildren(...kids);
+}
+function buildPredict(id) {
+  clearInterval(predTimer);
+  const file = h("input", { type: "file", accept: "image/*,video/*,.mkv,.mov", required: "" });
+  const conf = h("input", { type: "number", min: "0.01", max: "0.99", step: "0.05", value: "0.25", style: "width:90px" });
+  const go = h("button", { class: "primary", type: "submit" }, "Run prediction"), status = h("span", { class: "muted" }), out = h("div", { class: "out" });
+  const form = h("form", { class: "row" }, file, h("span", { class: "muted" }, "confidence"), conf, go, status);
+  form.onsubmit = ev => {
+    ev.preventDefault(); out.replaceChildren(); go.disabled = true;
+    const fd = new FormData(); fd.append("file", file.files[0]); fd.append("conf", conf.value);
+    const x = new XMLHttpRequest(); x.open("POST", `/api/jobs/${id}/predict`);
+    x.upload.onprogress = e => { if (e.lengthComputable) status.textContent = Math.round(e.loaded / e.total * 100) + "% uploaded"; };
+    x.onerror = () => { go.disabled = false; status.textContent = ""; say("network error during upload", true); };
+    x.onload = () => {
+      let d = {}; try { d = JSON.parse(x.responseText); } catch {}
+      if (x.status === 401) return showLogin();
+      if (x.status >= 300) { go.disabled = false; status.textContent = ""; return say(typeof d.detail === "string" ? d.detail : "upload failed (" + x.status + ")", true); }
+      const tick = async () => {
+        let p; try { p = await api("/api/predict/" + d.id); } catch (e) { clearInterval(predTimer); go.disabled = false; return fail(e); }
+        status.textContent = p.state === "running" ? `running ${Math.round(p.frac * 100)}%` : p.state;
+        if (p.state === "done" || p.state === "failed") {
+          clearInterval(predTimer); go.disabled = false; status.textContent = "";
+          p.state === "done" ? showPrediction(out, p, conf.value) : out.replaceChildren(h("p", { class: "m-bad", style: "padding:8px 12px;border-radius:8px" }, p.error));
+        }
+      };
+      clearInterval(predTimer); predTimer = setInterval(tick, 1500); tick();
+    };
+    x.send(fd);
+  };
+  $("#predict").replaceChildren(h("h2", {}, "Predict with this model"), form,
+    h("p", { class: "muted" }, "Send an image or a video. The result shows the boxes drawn on it. Runs on the server CPU and is not queued behind training; a long video takes a while."), out);
+}
+function showPrediction(out, p, conf) {
+  const kids = [];
+  const table = (head, rows) => h("table", {}, h("tr", {}, head.map(t => h("th", {}, t))), rows.map(r => h("tr", {}, r.map(c => h("td", {}, c)))));
+  if (p.kind === "image") {
+    const d = p.result.detections;
+    kids.push(h("p", {}, d.length ? `${d.length} object${d.length > 1 ? "s" : ""} found` : `Nothing found at confidence ${conf}; try a lower value.`));
+    if (d.length) kids.push(table(["Class", "Confidence", "Box (x1 y1 x2 y2)"], d.map(x => [x.name, x.conf.toFixed(2), x.box.join(" ")])));
+    kids.push(h("img", { src: p.file, alt: "prediction" }));
+  } else {
+    const c = Object.entries(p.result.classes);
+    kids.push(h("p", {}, `${p.result.frames} frames (${p.result.seconds} s) checked. ` + (c.length ? "" : `Nothing found at confidence ${conf}; try a lower value.`)));
+    if (c.length) kids.push(table(["Class", "Frames with it", "Most at once"], c.map(([k, v]) => [k, v.frames, v.max_in_frame])));
+    kids.push(h("video", { src: p.file, controls: "" }));
+  }
+  kids.push(h("p", {}, h("a", { href: p.file, download: "" }, h("button", {}, "Download result"))));
+  out.replaceChildren(...kids);
+}
+function renderRows() { document.querySelectorAll("tr.job").forEach(r => r.classList.remove("sel")); }
+async function cancelJob(id) {
+  if (!confirm("Cancel job " + id + "? A running training is stopped and its result is lost.")) return;
+  try { await api(`/api/jobs/${id}/cancel`, "POST", {}); say("cancel sent"); poll(); } catch (e) { fail(e); }
+}
+
+async function deleteJob(id) {
+  if (!confirm("Delete job " + id + " with its log, training files and result? This cannot be undone.")) return;
+  try {
+    await api("/api/jobs/" + id, "DELETE"); say("job deleted");
+    if (sel === id) { sel = null; $("#detail").classList.add("hide"); syncExtras(null); }
+    poll();
+  } catch (e) { fail(e); }
+}
+
+// ---- datasets ----
+let datasets = [];
+async function loadDatasets() {
+  try { datasets = await api("/api/datasets"); } catch (e) { return fail(e); }
+  const admin = me.role === "admin";
+  $("#dsTitle").textContent = admin ? "All datasets" : "My datasets";
+  document.querySelectorAll(".adm").forEach(e => e.classList.toggle("hide", !admin));
+  $("#nods").classList.toggle("hide", datasets.length > 0);
+  $("#dsRows").replaceChildren(...datasets.map(d => h("tr", {},
+    h("td", {}, d.name), admin ? h("td", {}, d.owner) : null, h("td", {}, d.images), h("td", {}, `${d.labeled} / ${d.background}`),
+    h("td", {}, Object.entries(d.classes).map(([k, v]) => `${k} ${v}`).join(", ")), h("td", {}, d.size_mb + " MB"), h("td", {}, when(d.created)), h("td", {}, d.jobs),
+    h("td", {}, h("div", { class: "row" },
+      h("button", { onclick: () => { $("#nd").value = d.id; pickDataset(); show("new"); } }, "Train with this"),
+      h("button", { class: "danger", onclick: () => deleteDataset(d) }, "Delete"))))));
+  const keep = $("#nd").value;
+  $("#nd").replaceChildren(h("option", { value: "" }, "Upload a new zip..."), ...datasets.map(d => h("option", { value: d.id }, `${d.name} (${d.images} images${admin ? ", " + d.owner : ""})`)));
+  $("#nd").value = datasets.some(d => d.id === keep) ? keep : ""; pickDataset();
+}
+// One input per option the server allows (me.options.settings); the value is checked again on the server.
+function buildSettings() {
+  $("#ns").replaceChildren(...me.options.settings.map(f => {
+    const auto = f.kind.startsWith("auto"), kind = f.kind.replace("auto ", "");
+    const choices = kind === "bool" ? ["true", "false"] : kind === "choice" ? f.low : null;
+    let el;
+    if (choices) {
+      el = h("select", {}, ...[...(auto ? ["auto"] : []), ...choices].map(c => h("option", {}, c)));
+    } else {
+      el = h("input", { type: kind === "text" || auto ? "text" : "number", maxlength: 200 });
+      if (kind !== "text" && !auto) { el.min = f.low; el.max = f.high; el.step = kind === "float" ? "any" : 1; }
+    }
+    el.value = String(f.default); el.dataset.name = f.section + "." + f.key; el.dataset.kind = kind;
+    el.title = f.help; el.className = "setting";
+    return h("div", {}, h("label", { title: f.help }, f.section + "." + f.key), el, h("small", { class: "muted" }, f.help));
+  }));
+}
+function collectSettings() {
+  const out = {};
+  for (const el of $$("#ns .setting")) {
+    const v = el.value.trim();
+    out[el.dataset.name] = v === "auto" || el.dataset.kind === "text" ? v : el.dataset.kind === "bool" ? v === "true" : el.dataset.kind === "choice" ? v : Number(v);
+  }
+  return out;
+}
+$("#nsReset").onclick = buildSettings;
+function pickDataset() { const none = !$("#nd").value; $("#nfBox").classList.toggle("hide", !none); $("#nf").required = none; }
+$("#nd").onchange = pickDataset;
+async function deleteDataset(d) {
+  if (!confirm(`Delete dataset "${d.name}"? Trainings that already used it keep their own copy.`)) return;
+  try { await api("/api/datasets/" + d.id, "DELETE"); say("dataset deleted"); loadDatasets(); } catch (e) { fail(e); }
+}
+$("#dsForm").onsubmit = ev => {
+  ev.preventDefault();
+  const fd = new FormData(); fd.append("file", $("#df").files[0]); fd.append("name", $("#dn").value);
+  const x = new XMLHttpRequest(); x.open("POST", "/api/datasets"); $("#dgo").disabled = true;
+  x.upload.onprogress = e => { if (e.lengthComputable) $("#dpct").textContent = Math.round(e.loaded / e.total * 100) + "% uploaded" + (e.loaded === e.total ? ", checking..." : ""); };
+  x.onload = () => {
+    $("#dgo").disabled = false; $("#dpct").textContent = ""; let d = {}; try { d = JSON.parse(x.responseText); } catch {}
+    if (x.status === 401) return showLogin();
+    if (x.status >= 300) return say(typeof d.detail === "string" ? d.detail : "upload failed (" + x.status + ")", true);
+    $("#dsForm").reset(); say("dataset saved: " + d.name); loadDatasets();
+  };
+  x.onerror = () => { $("#dgo").disabled = false; say("network error during upload", true); };
+  x.send(fd);
+};
+
+$("#loginForm").onsubmit = async ev => {
+  ev.preventDefault();
+  try { await api("/api/login", "POST", { name: $("#ln").value, password: $("#lp").value }); $("#lp").value = ""; start(); } catch (e) { fail(e); }
+};
+$("#logout").onclick = async () => { await api("/api/logout", "POST", {}).catch(() => {}); showLogin(); };
+
+$("#newForm").onsubmit = ev => {
+  ev.preventDefault();
+  const fd = new FormData();
+  if ($("#nd").value) fd.append("dataset", $("#nd").value); else fd.append("file", $("#nf").files[0]);
+  fd.append("model", $("#nm").value); fd.append("epochs", $("#ne").value); fd.append("note", $("#nn").value);
+  fd.append("settings", JSON.stringify(collectSettings())); fd.append("target", $("#nt").value || 0);
+  const x = new XMLHttpRequest(); x.open("POST", "/api/jobs");
+  $("#go").disabled = true;
+  x.upload.onprogress = e => { if (e.lengthComputable) $("#upct").textContent = Math.round(e.loaded / e.total * 100) + "% uploaded"; };
+  x.onload = () => {
+    $("#go").disabled = false; let d = {}; try { d = JSON.parse(x.responseText); } catch {}
+    if (x.status === 401) return showLogin();
+    if (x.status >= 300) { $("#upct").textContent = ""; return say(typeof d.detail === "string" ? d.detail : "upload failed (" + x.status + ")", true); }
+    $("#upct").textContent = ""; $("#newForm").reset(); buildSettings(); $("#ne").value = Math.min(50, me.options.max_epochs);
+    say("Queued as " + d.id); sel = d.id; show("queue"); poll();
+  };
+  x.onerror = () => { $("#go").disabled = false; say("network error during upload", true); };
+  x.send(fd);
+};
+
+$("#emailForm").onsubmit = async ev => { ev.preventDefault(); try { await api("/api/me/email", "POST", { email: $("#ae").value }); say("email saved"); } catch (e) { fail(e); } };
+$("#pwForm").onsubmit = async ev => {
+  ev.preventDefault();
+  try { await api("/api/me/password", "POST", { old: $("#po").value, new: $("#pn").value }); say("password changed"); $("#pwForm").reset(); } catch (e) { fail(e); }
+};
+
+async function loadAdmin() {
+  loadModels();
+  try {
+    const users = await api("/api/users");
+    $("#users").replaceChildren(...users.map(u => {
+      const role = h("select", { onchange: () => patch(u.name, { role: role.value }) }, h("option", {}, "user"), h("option", {}, "admin")); role.value = u.role;
+      const email = h("input", { type: "email", value: u.email, onchange: () => patch(u.name, { email: email.value }) });
+      const act = h("input", { type: "checkbox", onchange: () => patch(u.name, { active: act.checked }) }); act.checked = u.active;
+      return h("tr", {}, h("td", {}, u.name), h("td", {}, role), h("td", {}, email), h("td", {}, act), h("td", {}, h("div", { class: "row" },
+        h("button", { onclick: () => { const p = prompt("New password for " + u.name + " (8+ characters):"); if (p) patch(u.name, { password: p }); } }, "Reset password"),
+        h("button", { class: "danger", onclick: async () => { if (confirm("Delete user " + u.name + "?")) { try { await api("/api/users/" + u.name, "DELETE"); loadAdmin(); } catch (e) { fail(e); } } } }, "Delete"))));
+    }));
+    const s = await api("/api/settings");
+    for (const k of ["smtp_host", "smtp_port", "smtp_security", "smtp_user", "smtp_from", "teams_url", "public_url"]) $("#s_" + k).value = s[k];
+    $("#js").value = s.job_share; loadHint();
+    $("#s_smtp_password").value = ""; $("#pwset").textContent = s.smtp_password_set ? "(saved)" : "";
+    $("#s_notify_email").checked = s.notify_email === "1"; $("#s_notify_teams").checked = s.notify_teams === "1";
+    $("#lastErr").textContent = s.last_notify_error ? "Last notification problem: " + s.last_notify_error : "";
+  } catch (e) { fail(e); }
+}
+async function patch(name, body) {
+  try { await api("/api/users/" + name, "PATCH", body); say("saved " + name); } catch (e) { fail(e); loadAdmin(); }
+}
+$("#userForm").onsubmit = async ev => {
+  ev.preventDefault();
+  try { await api("/api/users", "POST", { name: $("#un").value, password: $("#up").value, email: $("#ue").value, role: $("#ur").value }); $("#userForm").reset(); loadAdmin(); say("user added"); } catch (e) { fail(e); }
+};
+function loadHint() {
+  const s = parseInt($("#js").value, 10), n = Math.floor(100 / s);
+  $("#loadHint").textContent = s >= 10 && s <= 100 ? `Up to ${n} job${n > 1 ? "s" : ""} run at the same time, each with ${s}% of the server.` : "";
+}
+let modelTimer;
+async function loadModels(keepTicks) {
+  clearTimeout(modelTimer);
+  try {
+    const ms = await api("/api/models");
+    // the 2 s refresh during a download must not throw away ticks that are not saved yet
+    const ticked = new Map([...$$("#models .mchk")].map(c => [c.dataset.name, c.checked]));
+    $("#models").replaceChildren(...ms.map(m => {
+      const on = h("input", { type: "checkbox", class: "mchk" }); on.checked = keepTicks && ticked.has(m.name) ? ticked.get(m.name) : m.allowed; on.dataset.name = m.name;
+      const busy = m.download === "downloading";
+      const state = busy ? "downloading..." : m.download || (m.downloaded ? `downloaded (${m.mb} MB)` : "not downloaded");
+      return h("tr", {}, h("td", {}, on), h("td", {}, m.name), h("td", {}, state),
+        h("td", {}, m.downloaded && !m.download ? "" : h("button", { disabled: busy, onclick: () => downloadModel(m.name) }, "Download")));
+    }));
+    if (ms.some(m => m.download === "downloading") && !$("#p-admin").classList.contains("hide")) modelTimer = setTimeout(() => loadModels(true), 2000);
+  } catch (e) { fail(e); }
+}
+async function downloadModel(name) { try { await api("/api/models/download", "POST", { name }); loadModels(true); } catch (e) { fail(e); } }
+$("#modelAdd").onclick = () => { const n = $("#modelNew").value.trim(); if (n) { $("#modelNew").value = ""; downloadModel(n); } };
+$("#modelSave").onclick = async () => {
+  try { await api("/api/models", "PUT", { allowed: [...$$("#models .mchk")].filter(c => c.checked).map(c => c.dataset.name) }); say("model list saved"); loadModels(); me = await api("/api/me"); $("#nm").replaceChildren(...me.options.models.map(m => h("option", {}, m))); }
+  catch (e) { fail(e); }
+};
+$("#js").oninput = loadHint;
+$("#loadForm").onsubmit = async ev => { ev.preventDefault(); try { await api("/api/settings", "PUT", { job_share: $("#js").value }); say("load saved"); } catch (e) { fail(e); } };
+function settingsBody() {
+  const b = {};
+  for (const k of ["smtp_host", "smtp_port", "smtp_security", "smtp_user", "smtp_password", "smtp_from", "teams_url", "public_url"]) b[k] = $("#s_" + k).value;
+  b.notify_email = $("#s_notify_email").checked ? "1" : "0"; b.notify_teams = $("#s_notify_teams").checked ? "1" : "0";
+  return b;
+}
+$("#setForm").onsubmit = async ev => { ev.preventDefault(); try { await api("/api/settings", "PUT", settingsBody()); say("settings saved"); loadAdmin(); } catch (e) { fail(e); } };
+async function test(channel) {
+  try { const r = await api("/api/settings/test", "POST", { channel, to: $("#testTo").value }); r.ok ? say("test sent") : say("test failed: " + r.error, true); } catch (e) { fail(e); }
+}
+$("#testMail").onclick = () => test("smtp");
+$("#testTeams").onclick = () => test("teams");
+
+start();
+</script>
+</body>
+</html>
