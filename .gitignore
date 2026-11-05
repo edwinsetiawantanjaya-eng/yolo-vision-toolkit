@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+.env
+*.db
+logs/
+.obsidian/
+
+# weights are downloaded by Ultralytics on first use
+*.pt
+
+# generated at runtime
+jobs/
+data/dataset/
+runs/*
+!runs/.keep
+outputs/*
+!outputs/.keep
